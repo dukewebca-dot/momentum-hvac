@@ -39,28 +39,30 @@
        [data-hs-hold]      hovering these pauses (defaults to the whole container)
      Timing is driven by the progress-bar animation, so every kind of pause
      (button, hover, offscreen, background tab) freezes the clock for free. */
+  (function () {
   var hs = $('[data-hs]');
-  if (hs) {
+  if (!hs) return;
     var slides = $$('.hs-slide', hs), copies = $$('[data-hs-copy] > *', hs), segs = $$('.hs-seg, .hs-tab', hs);
-    var pauseBtn = $('#hsPause'), cap = $('#hsCap'), count = $('[data-hs-count]', hs);
+    var pauseBtn = $('#hsPause'), count = $('[data-hs-count]', hs);
     var HS_MS = +(hs.getAttribute('data-hs-ms') || 7000), cur = 0, why = {};
     hs.style.setProperty('--hs-ms', HS_MS + 'ms');
     var setPaused = function (k, v) { why[k] = v; hs.classList.toggle('paused', Object.keys(why).some(function (x) { return why[x]; })); };
     var hide = function (el, off) { if (!el) return; if (off) { el.setAttribute('aria-hidden', 'true'); el.setAttribute('inert', ''); } else { el.removeAttribute('aria-hidden'); el.removeAttribute('inert'); } };
     copies.forEach(function (c, k) { hide(c, k !== 0); });
-    // Load the other photos only after the page has finished loading (keeps first paint fast)
-    var hydrate = function () {
-      slides.slice(1).forEach(function (sl) {
-        $$('[data-srcset]', sl).forEach(function (e) { e.srcset = e.getAttribute('data-srcset'); e.removeAttribute('data-srcset'); });
-        var im = $('img[data-src]', sl); if (im) { im.src = im.getAttribute('data-src'); im.removeAttribute('data-src'); }
-      });
+    // Photos load one step ahead: slide 2 after page load, then each next slide as the previous one shows.
+    var hydrate = function (k) {
+      var sl = slides[(k + slides.length) % slides.length];
+      $$('[data-srcset]', sl).forEach(function (e) { e.srcset = e.getAttribute('data-srcset'); e.removeAttribute('data-srcset'); });
+      var im = $('img[data-src]', sl); if (im) { im.src = im.getAttribute('data-src'); im.removeAttribute('data-src'); }
     };
-    if (document.readyState === 'complete') setTimeout(hydrate, 300); else addEventListener('load', function () { setTimeout(hydrate, 300); });
+    if (document.readyState === 'complete') setTimeout(function () { hydrate(1); }, 300);
+    else addEventListener('load', function () { setTimeout(function () { hydrate(1); }, 300); });
 
     var go = function (i) {
       i = (i + slides.length) % slides.length;
       if (i === cur) return;
       slides.forEach(function (s) { s.classList.remove('prev'); });
+      hydrate(i); hydrate(i + 1);
       var old = slides[cur], nxt = slides[i];
       old.classList.remove('active'); old.classList.add('prev'); old.setAttribute('aria-hidden', 'true');
       nxt.classList.add('active'); nxt.removeAttribute('aria-hidden');
@@ -73,13 +75,6 @@
       });
       if (segs[i]) { void segs[i].offsetWidth; segs[i].classList.add('on'); }
       if (count) count.textContent = (i < 9 ? '0' : '') + (i + 1);
-      if (cap) { // caption style used by the original side-image hero
-        cap.href = nxt.getAttribute('data-href');
-        $('#hsNum').textContent = '0' + (i + 1);
-        $('#hsName').textContent = nxt.getAttribute('data-name');
-        $('#hsText').innerHTML = nxt.getAttribute('data-cap');
-        cap.classList.remove('swap'); void cap.offsetWidth; cap.classList.add('swap');
-      }
       cur = i;
     };
     var advance = function () {
@@ -127,7 +122,7 @@
     hs.addEventListener('focusout', function () { setPaused('focus', false); });
     document.addEventListener('visibilitychange', function () { setPaused('tab', document.hidden); });
     if (hasIO) new IntersectionObserver(function (e) { setPaused('off', !e[0].isIntersecting); }, { threshold: 0.2 }).observe(hs);
-  }
+  })();
 
   /* ---------- Live Regina temperature (Open-Meteo, no API key) ----------
      Falls back to the −34°C design temperature already in the HTML if the request fails. */
