@@ -1,0 +1,8 @@
+{
+  "name": "Momentum HVAC Services",
+  "short_name": "Momentum HVAC",
+  "icons": [{ "src": "/apple-touch-icon.png", "sizes": "180x180", "type": "image/png" }],
+  "theme_color": "#08142b",
+  "background_color": "#ffffff",
+  "display": "browser"
+}

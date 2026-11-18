@@ -1,0 +1,54 @@
+# Netlify config. Publish directory is the project root (no build step).
+[build]
+  publish = "."
+  command = ""
+
+# Redirect the old site's URLs so existing Google results and bookmarks keep working.
+[[redirects]]
+  from = "/Heating.php"
+  to = "/services/heating.html"
+  status = 301
+[[redirects]]
+  from = "/Cooling.php"
+  to = "/services/cooling.html"
+  status = 301
+[[redirects]]
+  from = "/Plumbing.php"
+  to = "/services/plumbing.html"
+  status = 301
+[[redirects]]
+  from = "/SheetMetalServices.php"
+  to = "/services/sheet-metal.html"
+  status = 301
+[[redirects]]
+  from = "/ElectricalServices.php"
+  to = "/services/electrical.html"
+  status = 301
+[[redirects]]
+  from = "/OurTeam.php"
+  to = "/team.html"
+  status = 301
+[[redirects]]
+  from = "/index.php"
+  to = "/"
+  status = 301
+[[redirects]]
+  from = "/_backup-original/*"
+  to = "/404.html"
+  status = 404
+  force = true
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    X-Frame-Options = "SAMEORIGIN"
