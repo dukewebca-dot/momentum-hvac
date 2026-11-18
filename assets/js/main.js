@@ -28,6 +28,97 @@
   status(); setInterval(status, 60000);
   var yr = $('#yr'); if (yr) yr.textContent = new Date().getFullYear();
 
+  /* ---------- Hero slideshow ----------
+     Timing is driven by the progress-bar animation, so every kind of pause
+     (button, hover, offscreen, background tab) freezes the clock for free. */
+  var hs = $('[data-hs]');
+  if (hs) {
+    var slides = $$('.hs-slide', hs), segs = $$('.hs-seg', hs), pauseBtn = $('#hsPause');
+    var cap = $('#hsCap'), HS_MS = 7000, cur = 0, why = {};
+    hs.style.setProperty('--hs-ms', HS_MS + 'ms');
+    var setPaused = function (k, v) { why[k] = v; hs.classList.toggle('paused', Object.keys(why).some(function (x) { return why[x]; })); };
+    // Load slides 2–5 only after the page has finished loading (keeps first paint fast)
+    var hydrate = function () {
+      slides.slice(1).forEach(function (sl) {
+        $$('[data-srcset]', sl).forEach(function (e) { e.srcset = e.getAttribute('data-srcset'); e.removeAttribute('data-srcset'); });
+        var im = $('img[data-src]', sl); if (im) { im.src = im.getAttribute('data-src'); im.removeAttribute('data-src'); }
+      });
+    };
+    if (document.readyState === 'complete') setTimeout(hydrate, 300); else addEventListener('load', function () { setTimeout(hydrate, 300); });
+
+    var go = function (i) {
+      i = (i + slides.length) % slides.length;
+      if (i === cur) return;
+      slides.forEach(function (s) { s.classList.remove('prev'); });
+      var old = slides[cur], nxt = slides[i];
+      old.classList.remove('active'); old.classList.add('prev'); old.setAttribute('aria-hidden', 'true');
+      nxt.classList.add('active'); nxt.removeAttribute('aria-hidden');
+      var img = $('img', nxt); img.style.animation = 'none'; void img.offsetWidth; img.style.animation = '';
+      setTimeout(function () { if (!old.classList.contains('active')) old.classList.remove('prev'); }, 1450);
+      segs.forEach(function (s, k) {
+        s.classList.remove('on'); s.classList.toggle('done', k < i);
+        if (k === i) s.setAttribute('aria-current', 'true'); else s.removeAttribute('aria-current');
+      });
+      void segs[i].offsetWidth; segs[i].classList.add('on');
+      cap.href = nxt.getAttribute('data-href');
+      $('#hsNum').textContent = '0' + (i + 1);
+      $('#hsName').textContent = nxt.getAttribute('data-name');
+      $('#hsText').innerHTML = nxt.getAttribute('data-cap');
+      cap.classList.remove('swap'); void cap.offsetWidth; cap.classList.add('swap');
+      cur = i;
+    };
+    var advance = function () {
+      var nextImg = $('img', slides[(cur + 1) % slides.length]);
+      if (nextImg.complete && nextImg.naturalWidth) go(cur + 1);
+      else nextImg.addEventListener('load', function () { go(cur + 1); }, { once: true });
+    };
+    segs.forEach(function (s, k) {
+      $('i', s).addEventListener('animationend', function () { if (s.classList.contains('on')) advance(); });
+      s.addEventListener('click', function () { go(k); });
+    });
+    // Reduced motion: no autoplay; the segment buttons still switch photos by hand.
+    if (reduceMotion) pauseBtn.hidden = true; else hs.classList.add('playing');
+    pauseBtn.setAttribute('aria-pressed', 'false');
+    pauseBtn.addEventListener('click', function () {
+      var p = pauseBtn.getAttribute('aria-pressed') !== 'true';
+      pauseBtn.setAttribute('aria-pressed', String(p));
+      pauseBtn.setAttribute('aria-label', p ? 'Play slideshow' : 'Pause slideshow');
+      hs.classList.add('playing');
+      setPaused('user', p);
+    });
+    hs.addEventListener('mouseenter', function () { setPaused('hover', true); });
+    hs.addEventListener('mouseleave', function () { setPaused('hover', false); });
+    hs.addEventListener('focusin', function () { setPaused('focus', true); });
+    hs.addEventListener('focusout', function () { setPaused('focus', false); });
+    document.addEventListener('visibilitychange', function () { setPaused('tab', document.hidden); });
+    if (hasIO) new IntersectionObserver(function (e) { setPaused('off', !e[0].isIntersecting); }).observe(hs);
+  }
+
+  /* ---------- Live Regina temperature (Open-Meteo, no API key) ----------
+     Falls back to the −34°C design temperature already in the HTML if the request fails. */
+  var wxTemp = $('#wxTemp');
+  if (wxTemp && window.fetch) {
+    var WX_URL = 'https://api.open-meteo.com/v1/forecast?latitude=50.4452&longitude=-104.6189&current=temperature_2m,apparent_temperature&timezone=America%2FRegina';
+    var fmt = function (n) { n = Math.round(n); return (n < 0 ? '−' + Math.abs(n) : n) + '°C'; };
+    var paint = function (c) {
+      wxTemp.textContent = fmt(c.temperature_2m);
+      $('#wxLabel').innerHTML = '<span class="live" aria-hidden="true"></span>Regina right now';
+      $('#wxFeels').textContent = 'Feels like ' + fmt(c.apparent_temperature);
+    };
+    var loadWx = function () {
+      try { // reuse a reading from the last 10 minutes
+        var s = JSON.parse(sessionStorage.getItem('wx') || 'null');
+        if (s && Date.now() - s.t < 600000) { paint(s.c); return; }
+      } catch (e) {}
+      fetch(WX_URL).then(function (r) { if (!r.ok) throw r; return r.json(); }).then(function (d) {
+        if (!d.current || typeof d.current.temperature_2m !== 'number') return;
+        paint(d.current);
+        try { sessionStorage.setItem('wx', JSON.stringify({ t: Date.now(), c: d.current })); } catch (e) {}
+      }).catch(function () { /* keep design-temp fallback */ });
+    };
+    loadWx(); setInterval(loadWx, 900000);
+  }
+
   /* ---------- Header ---------- */
   var nav = $('#nav'), burger = $('#burger'), mcall = $('.mcall');
   var ticking = false;
